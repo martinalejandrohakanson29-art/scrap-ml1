@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBtn = document.getElementById('searchBtn');
     const loadingEl = document.getElementById('loading');
     const errorEl = document.getElementById('error');
-    const resultsGrid = document.getElementById('resultsGrid');
+    const resultsTableBody = document.getElementById('resultsTableBody');
 
     searchBtn.addEventListener('click', performSearch);
     searchInput.addEventListener('keypress', (e) => {
@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Reset state
         errorEl.classList.add('hidden');
-        resultsGrid.innerHTML = '';
+        resultsTableBody.innerHTML = '';
         loadingEl.classList.remove('hidden');
 
         try {
@@ -52,24 +52,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderResults(results) {
-        resultsGrid.innerHTML = '';
+        resultsTableBody.innerHTML = '';
         results.forEach(item => {
-            const card = document.createElement('div');
-            card.className = 'card';
+            const tr = document.createElement('tr');
             
-            const imgData = item.image ? `<img src="${item.image}" alt="Imagen del producto" loading="lazy">` : '<div style="height:100%; display:flex; align-items:center;">Sin Imagen</div>';
+            const imgData = item.image ? `<img src="${item.image}" alt="Imagen del producto" loading="lazy" class="thumb">` : '<div class="no-img">Sin Imagen</div>';
 
-            card.innerHTML = `
-                <div class="card-img-container">
-                    ${imgData}
-                </div>
-                <div class="card-content">
-                    <h2>${item.title}</h2>
-                    <div class="price">${item.price}</div>
-                    <a href="${item.link}" target="_blank" class="card-btn">Ver producto</a>
-                </div>
+            const originalPriceHtml = item.originalPrice ? `<div class="original-price">${item.originalPrice}</div>` : '';
+            
+            tr.innerHTML = `
+                <td class="col-thumb">${imgData}</td>
+                <td class="col-product">
+                    <a href="${item.link}" target="_blank" class="product-link">
+                        ${item.title}
+                    </a>
+                </td>
+                <td class="col-price">
+                    ${originalPriceHtml}
+                    <div class="current-price">${item.price}</div>
+                </td>
+                <td class="col-installments">${item.installments || '-'}</td>
+                <td class="col-shipping">
+                    ${item.shippingStatus ? `<span class="shipping-badge">${item.shippingStatus}</span>` : '-'}
+                </td>
             `;
-            resultsGrid.appendChild(card);
+
+            resultsTableBody.appendChild(tr);
         });
     }
 });
