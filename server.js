@@ -68,9 +68,9 @@ app.get('/api/search', async (req, res) => {
             console.log(`Revisala en: https://tu-dominio.com/debug.png`);
         }
 
-        const results = await page.evaluate(() => {
+        const rawResults = await page.evaluate(() => {
             const items = Array.from(document.querySelectorAll('.ui-search-layout__item, .poly-card'));
-            return items.slice(0, 20).map(item => {
+            return items.slice(0, 40).map(item => {
                 const titleEl = item.querySelector('h2') || item.querySelector('h3');
                 const title = titleEl ? titleEl.innerText.trim() : 'Sin título';
 
@@ -92,7 +92,11 @@ app.get('/api/search', async (req, res) => {
 
                 const linkEl = item.querySelector('a');
                 const link = linkEl ? linkEl.href : '';
-                
+
+                // Extraer código MLA del link para deduplicación
+                const mlaMatch = link.match(/MLA-?(\d+)/i);
+                const mlaId = mlaMatch ? `MLA${mlaMatch[1]}` : null;
+
                 const imgEl = item.querySelector('img');
                 let imgUrl = '';
                 if (imgEl) {
@@ -114,8 +118,15 @@ app.get('/api/search', async (req, res) => {
                 installments = installments.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
 
                 // Estado de Envío (Gratis / Full)
+                // Usamos selectores precisos — evitamos innerHTML.includes() que generaba falsos positivos
                 const shippingEl = item.querySelector('.poly-component__shipping, .ui-search-item__fulfillment');
-                const hasFull = item.querySelector('svg.ui-search-icon--full') !== null || !!item.querySelector('.ui-search-icon--full') || item.innerHTML.includes('icon-full');
+                const hasFull = item.querySelector(
+                    'svg.ui-search-icon--full, ' +
+                    '.ui-search-item__fulfillment-icon--full, ' +
+                    '.poly-shipping__status--full, ' +
+                    '[data-testid="fulfillment"], ' +
+                    '[aria-label="Full"]'
+                ) !== null;
                 let shippingStatus = '';
                 if (shippingEl && shippingEl.innerText.toLowerCase().includes('gratis')) {
                     shippingStatus = 'Envío Gratis';
@@ -124,17 +135,33 @@ app.get('/api/search', async (req, res) => {
                     shippingStatus = shippingStatus ? shippingStatus + ' ⚡ Full' : '⚡ Full';
                 }
 
+                // Vendedor
+                const sellerEl = item.querySelector('.poly-component__seller, .ui-search-official-store-label');
+                const isAd = item.querySelector('.poly-component__ads-promotions') !== null;
+                const seller = sellerEl ? sellerEl.innerText.trim() : (isAd ? 'Publicidad' : '');
+
                 return {
                     title,
                     price: `$ ${priceText}`,
                     originalPrice,
                     link,
+                    mlaId,
                     image: imgUrl,
                     installments,
-                    shippingStatus
+                    shippingStatus,
+                    seller
                 };
             });
         });
+
+        // Deduplicar por código MLA (evita productos repetidos en el listado)
+        const seen = new Set();
+        const results = rawResults.filter(item => {
+            if (!item.mlaId) return true; // sin MLA ID lo dejamos pasar
+            if (seen.has(item.mlaId)) return false;
+            seen.add(item.mlaId);
+            return true;
+        }).slice(0, 20);
 
         console.log(`Resultados extraídos: ${results.length}`);
         await browser.close();

@@ -132,6 +132,22 @@ main {
     border-bottom: 2px solid #eee;
 }
 
+.results-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.results-table th.sortable:hover {
+    background-color: #eeeeee;
+    color: var(--accent);
+}
+
+#sortIndicator {
+    font-size: 0.85rem;
+    margin-left: 4px;
+    color: var(--accent);
+}
+
 .results-table td {
     padding: 1rem;
     border-bottom: 1px solid #eee;
@@ -215,6 +231,19 @@ main {
 
 .col-shipping {
     font-size: 0.9rem;
+}
+
+.col-seller {
+    font-size: 0.85rem;
+    color: #555;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.seller-ad {
+    font-size: 0.75rem;
+    color: #999;
+    font-style: italic;
 }
 
 .shipping-badge {
