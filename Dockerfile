@@ -1,20 +1,20 @@
-# Usa la imagen oficial de Playwright recomendada para asegurar que los navegadores y sus dependencias estén instalados
-FROM mcr.microsoft.com/playwright:v1.42.1-jammy
+# Usamos exactamente la versión que nos pidió el error para que todo coincida
+FROM mcr.microsoft.com/playwright:v1.58.2-jammy
 
-# Crea y establece el directorio de trabajo dentro del contenedor
+# El resto del proceso se mantiene igual
 WORKDIR /app
 
-# Copia los archivos de configuración de npm (package.json y package-lock.json si existe)
+# Copiamos los archivos de configuración
 COPY package*.json ./
 
-# Instala las dependencias de Node.js (express, cors, playwright)
+# Instalamos las dependencias (aquí se instalará Playwright 1.58.2)
 RUN npm install
 
-# Copia el resto de los archivos del proyecto (server.js y la carpeta public)
+# Copiamos el resto del código
 COPY . .
 
-# Expone el puerto 3000 para que funcione con el proxy inverso de Coolify
+# Exponemos el puerto
 EXPOSE 3000
 
-# Comando de inicio del servidor
+# Arrancamos el servidor
 CMD ["node", "server.js"]

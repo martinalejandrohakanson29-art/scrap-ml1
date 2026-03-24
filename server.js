@@ -1,6 +1,8 @@
 const express = require('express');
 const { chromium } = require('playwright');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,39 +12,68 @@ app.use(express.static('public'));
 
 app.get('/api/search', async (req, res) => {
     const keyword = req.query.q;
-    
+
     if (!keyword) {
         return res.status(400).json({ error: 'Falta la palabra clave para la búsqueda' });
     }
 
     let browser = null;
     try {
-        console.log(`Iniciando búsqueda para: ${keyword}`);
-        browser = await chromium.launch({ headless: true });
-        const context = await browser.newContext({
-             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-             viewport: { width: 1920, height: 1080 }
+        console.log(`--- NUEVA BÚSQUEDA ---`);
+        console.log(`Buscando: "${keyword}"`);
+
+        // Iniciamos el navegador con flags de sigilo para evitar bloqueos
+        browser = await chromium.launch({
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-blink-features=AutomationControlled' // Clave para ocultar que es un bot
+            ]
         });
+
+        const context = await browser.newContext({
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            viewport: { width: 1280, height: 720 }
+        });
+
         const page = await context.newPage();
-        
         const searchUrl = `https://listado.mercadolibre.com.ar/${encodeURIComponent(keyword)}`;
-        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        
+
+        console.log(`Navegando a: ${searchUrl}`);
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+        // LOGS DE DIAGNÓSTICO
+        const pageTitle = await page.title();
+        const currentUrl = page.url();
+        console.log(`Título de la página: "${pageTitle}"`);
+        console.log(`URL actual: ${currentUrl}`);
+
+        // Verificamos si estamos en una página de bloqueo
+        if (pageTitle.includes("robot") || pageTitle.includes("moment") || currentUrl.includes("captcha")) {
+            console.error("ALERTA: Mercado Libre detectó el bot (CAPTCHA visible).");
+        }
+
+        // Intentamos esperar a los productos
         try {
-            await page.waitForSelector('.ui-search-layout__item', { timeout: 5000 });
+            await page.waitForSelector('.ui-search-layout__item, .poly-card', { timeout: 10000 });
+            console.log("Éxito: Se encontraron elementos en el DOM.");
         } catch (e) {
-            console.log('No se encontraron items (o cambió el selector o la página está vacía).');
+            console.log("Aviso: No se encontraron items con los selectores estándar.");
+
+            // GENERAR CAPTURA DE PANTALLA PARA DEBUG
+            const debugPath = path.join(__dirname, 'public', 'debug.png');
+            await page.screenshot({ path: debugPath });
+            console.log(`Captura de pantalla de error guardada en: ${debugPath}`);
+            console.log(`Revisala en: https://tu-dominio.com/debug.png`);
         }
 
         const results = await page.evaluate(() => {
             const items = Array.from(document.querySelectorAll('.ui-search-layout__item, .poly-card'));
-            
-            const selectedItems = items.slice(0, 20);
-            
-            return selectedItems.map(item => {
+            return items.slice(0, 20).map(item => {
                 const titleEl = item.querySelector('h2') || item.querySelector('h3');
                 const title = titleEl ? titleEl.innerText.trim() : 'Sin título';
-                
+
                 // Precio Original (si existe rebaja)
                 const originalPriceEls = item.querySelectorAll('.andes-money-amount--previous .andes-money-amount__fraction, s .andes-money-amount__fraction');
                 const originalPriceText = originalPriceEls.length > 0 ? originalPriceEls[0].innerText.trim() : null;
@@ -58,7 +89,7 @@ app.get('/api/search', async (req, res) => {
                     const mainPrices = priceEls.filter(el => !el.closest('.andes-money-amount--previous') && !el.closest('s'));
                     priceText = mainPrices.length > 0 ? mainPrices[0].innerText.trim() : '0';
                 }
-                
+
                 const linkEl = item.querySelector('a');
                 const link = linkEl ? linkEl.href : '';
                 
@@ -92,7 +123,7 @@ app.get('/api/search', async (req, res) => {
                 if (hasFull) {
                     shippingStatus = shippingStatus ? shippingStatus + ' ⚡ Full' : '⚡ Full';
                 }
-                
+
                 return {
                     title,
                     price: `$ ${priceText}`,
@@ -105,19 +136,17 @@ app.get('/api/search', async (req, res) => {
             });
         });
 
+        console.log(`Resultados extraídos: ${results.length}`);
         await browser.close();
-        browser = null;
-
         res.json({ results });
+
     } catch (error) {
-        console.error('Error durante el scraping:', error);
-        if (browser) {
-            await browser.close();
-        }
-        res.status(500).json({ error: 'Error al obtener los datos. Intente nuevamente.' });
+        console.error('Error crítico durante el proceso:', error.message);
+        if (browser) await browser.close();
+        res.status(500).json({ error: 'Error interno del scraper.', details: error.message });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`Servidor corriendo en el puerto ${PORT}`);
+    console.log(`Servidor activo en puerto ${PORT}`);
 });
