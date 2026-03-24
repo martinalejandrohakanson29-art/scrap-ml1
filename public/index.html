@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scraper Mercado Libre</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Buscador de Mercado Libre</h1>
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Ingresa una palabra clave ej: auriculares">
+            <button id="searchBtn">Buscar</button>
+        </div>
+    </header>
+    
+    <main>
+        <div id="loading" class="hidden">
+            <div class="spinner"></div>
+            <p>Cargando...</p>
+        </div>
+        <div id="error" class="error-msg hidden"></div>
+        <div id="resultsGrid" class="results-grid"></div>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
